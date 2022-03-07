@@ -9,8 +9,11 @@ import time
 
 
 def dft_conv(imgR, imgIm, kernelR, kernelIm):
+    """Performed a complex number multiplication and then sums the kernel dimension"""
+    # img shape: (batch, kernels, width, height, complex)
     # Fast complex multiplication
     #print(kernelR.shape, imgR.shape)
+
     ac = torch.mul(kernelR, imgR)
     bd = torch.mul(kernelIm, imgIm)
 
@@ -19,7 +22,7 @@ def dft_conv(imgR, imgIm, kernelR, kernelIm):
     imgsR = ac - bd
     imgsIm = ab_cd - ac - bd
 
-    # Sum over in channels
+    # Sum over in channels (sums over the kernel dim)
     imgsR = imgsR.sum(1)
     imgsIm = imgsIm.sum(1)
 
@@ -27,6 +30,8 @@ def dft_conv(imgR, imgIm, kernelR, kernelIm):
 
 
 class FFT_Conv_Layer(nn.Module):
+    """Implements a 2D convolutional layer with FFT """
+    # torch.nn.conv2 uses sliding window.
 
     def __init__(self, imgSize, inCs, outCs, imagDim, filtSize, cuda=False):
         super(FFT_Conv_Layer, self).__init__()
@@ -83,79 +88,80 @@ class FFT_Conv_Layer(nn.Module):
 
         return imgs
 
-class spectral_pool_layer(nn.Module):
-    def __init__(self, filter_size=3, freq_dropout_lower_bound=None, freq_dropout_upper_bound=None, train_phase=False):
-        super(spectral_pool_layer, self).__init__()
-        # assert only 1 dimension passed for filter size
-        assert isinstance(filter_size, int)
-        # input_shape = x.shape
-        # assert len(input_shape) == 4
-        # _, _, H, W = input_shape
-        # assert H == W
-
-        self.filter_size = filter_size
-        self.freq_dropout_lower_bound = freq_dropout_lower_bound
-        self.freq_dropout_upper_bound = freq_dropout_upper_bound
-        self.activation = F
-        self.train_phase = train_phase
-
-    def forward(self, x):
-        # Compute the Fourier transform of the image
-        im_fft = torch.rfft(x, 2, onesided=False)
-
-        # Truncate the spectrum
-        im_transformed = self._common_spectral_pool(im_fft, self.filter_size)
-
-        if (self.freq_dropout_lower_bound is not None and self.freq_dropout_upper_bound is not None):
-            def true_fn():
-                tf_random_cutoff = tf.random_uniform(
-                    [],
-                    freq_dropout_lower_bound,
-                    freq_dropout_upper_bound
-                )
-                dropout_mask = _frequency_dropout_mask(
-                    filter_size,
-                    tf_random_cutoff
-                )
-                return im_transformed * dropout_mask
-
-            # In the testing phase, return the truncated frequency
-            # matrix unchanged.
-            def false_fn():
-                return im_transformed
-
-            im_downsampled = tf.cond(
-                self.train_phase,
-                true_fn=true_fn,
-                false_fn=false_fn
-            )
-            im_out = torch.irfft(im_downsampled, 2, onesided=False)
-
-        else:
-            im_out = torch.irfft(im_transformed, 2, onesided=False)
-
-        if self.activation is not None:
-            cell_out = self.activation.relu(im_out)
-        else:
-            cell_out = im_out
-        return cell_out
-
-    def _common_spectral_pool(self, images, filter_size):
-        assert len(images.shape) == 5
-        assert filter_size >= 3
-
-        if filter_size % 2 == 1:
-            n = int((filter_size - 1) / 2)
-            top_left = images[:, :, :n + 1, :n + 1]
-            top_right = images[:, :, :n + 1, -n:]
-            bottom_left = images[:, :, -n:, :n + 1]
-            bottom_right = images[:, :, -n:, -n:]
-            top_combined = torch.cat([top_left, top_right], axis=-2)
-            # print(top_combined.shape)
-            bottom_combined = torch.cat([bottom_left, bottom_right], axis=-2)
-            # print(bottom_combined.shape)
-            all_together = torch.cat([top_combined, bottom_combined], axis=-3)
-            return all_together
+# unused code
+# class spectral_pool_layer(nn.Module):
+#     def __init__(self, filter_size=3, freq_dropout_lower_bound=None, freq_dropout_upper_bound=None, train_phase=False):
+#         super(spectral_pool_layer, self).__init__()
+#         # assert only 1 dimension passed for filter size
+#         assert isinstance(filter_size, int)
+#         # input_shape = x.shape
+#         # assert len(input_shape) == 4
+#         # _, _, H, W = input_shape
+#         # assert H == W
+#
+#         self.filter_size = filter_size
+#         self.freq_dropout_lower_bound = freq_dropout_lower_bound
+#         self.freq_dropout_upper_bound = freq_dropout_upper_bound
+#         self.activation = F
+#         self.train_phase = train_phase
+#
+#     def forward(self, x):
+#         # Compute the Fourier transform of the image
+#         im_fft = torch.rfft(x, 2, onesided=False)
+#
+#         # Truncate the spectrum
+#         im_transformed = self._common_spectral_pool(im_fft, self.filter_size)
+#
+#         if (self.freq_dropout_lower_bound is not None and self.freq_dropout_upper_bound is not None):
+#             def true_fn():
+#                 tf_random_cutoff = tf.random_uniform(
+#                     [],
+#                     freq_dropout_lower_bound,
+#                     freq_dropout_upper_bound
+#                 )
+#                 dropout_mask = _frequency_dropout_mask(
+#                     filter_size,
+#                     tf_random_cutoff
+#                 )
+#                 return im_transformed * dropout_mask
+#
+#             # In the testing phase, return the truncated frequency
+#             # matrix unchanged.
+#             def false_fn():
+#                 return im_transformed
+#
+#             im_downsampled = tf.cond(
+#                 self.train_phase,
+#                 true_fn=true_fn,
+#                 false_fn=false_fn
+#             )
+#             im_out = torch.irfft(im_downsampled, 2, onesided=False)
+#
+#         else:
+#             im_out = torch.irfft(im_transformed, 2, onesided=False)
+#
+#         if self.activation is not None:
+#             cell_out = self.activation.relu(im_out)
+#         else:
+#             cell_out = im_out
+#         return cell_out
+#
+#     def _common_spectral_pool(self, images, filter_size):
+#         assert len(images.shape) == 5
+#         assert filter_size >= 3
+#
+#         if filter_size % 2 == 1:
+#             n = int((filter_size - 1) / 2)
+#             top_left = images[:, :, :n + 1, :n + 1]
+#             top_right = images[:, :, :n + 1, -n:]
+#             bottom_left = images[:, :, -n:, :n + 1]
+#             bottom_right = images[:, :, -n:, -n:]
+#             top_combined = torch.cat([top_left, top_right], axis=-2)
+#             # print(top_combined.shape)
+#             bottom_combined = torch.cat([bottom_left, bottom_right], axis=-2)
+#             # print(bottom_combined.shape)
+#             all_together = torch.cat([top_combined, bottom_combined], axis=-3)
+#             return all_together
 
 
 class StudentNetwork_noRelu(nn.Module):
@@ -176,10 +182,12 @@ class StudentNetwork_noRelu(nn.Module):
         self.m = nn.LogSoftmax(dim=1)
 
     def forward(self, x):
+        # optical domain
         forw = self.conv1(x)
         forw = self.conv2(forw)
         forw = self.conv3(forw)
 
+        # electronic backend
         forw = self.conv2_bn(forw)
         #forw = self.maxpool(forw)
         forw = self.avepool(forw)
