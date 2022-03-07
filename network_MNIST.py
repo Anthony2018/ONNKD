@@ -48,7 +48,7 @@ class FFT_Conv_Layer(nn.Module):
         imgs = F.pad(imgs, (0, 0, 0, self.filtSize - 1, 0, self.filtSize - 1))
         imgs = imgs.squeeze(5)
 
-        imgs = torch.fft.rfft(imgs, 2, onesided=False)
+        imgs = torch.rfft(imgs, 2, onesided=False)
         # print(imgs.shape)
 
         # Extract the real and imaginary parts
